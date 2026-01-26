@@ -83,7 +83,7 @@ git clone https://github.com/YOUR-USERNAME/hoodi-validator.git
 cd hoodi-validator
 
 # Or download and extract
-cd hoodi-validator-fixed
+cd hoodi-validator
 ```
 
 ### Step 2: Run Setup Script
@@ -205,15 +205,15 @@ python3 deposit.py new-mnemonic --chain hoodi
 
 ```bash
 # On your local machine
-scp -r ~/validator_keys user@server:~/hoodi-validator-fixed/data/validator/
-scp ~/deposit_data-*.json user@server:~/hoodi-validator-fixed/
+scp -r ~/validator_keys user@server:~/hoodi-validator/data/validator/
+scp ~/deposit_data-*.json user@server:~/hoodi-validator/
 ```
 
 ### Step 3: Start Services
 
 ```bash
 # On the server
-cd ~/hoodi-validator-fixed
+cd ~/hoodi-validator
 
 # Start all services
 docker compose up -d
