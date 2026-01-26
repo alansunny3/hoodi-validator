@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # Execution Layer (Geth)
   geth:
-    image: ethereum/client-go:${GETH_VERSION:-v1.15.1}
+    image: ethereum/client-go:${GETH_VERSION:-v1.16.8}
     container_name: hoodi-geth
     restart: unless-stopped
     command:
@@ -31,6 +31,7 @@ services:
       - --txlookuplimit=${GETH_TX_LOOKUP_LIMIT:-2350000}
       - --maxpeers=${GETH_MAX_PEERS:-50}
       - --nat=extip:${GETH_NAT_IP:-0.0.0.0}
+
     volumes:
       - ./data/geth:/data/geth
       - ./jwt:/jwt:ro
@@ -40,20 +41,6 @@ services:
       - "${GETH_P2P_TCP_PORT:-30303}:${GETH_P2P_TCP_PORT:-30303}"
       - "${GETH_P2P_UDP_PORT:-30303}:${GETH_P2P_UDP_PORT:-30303}/udp"
       - "${GETH_METRICS_ADDR:-127.0.0.1}:${GETH_METRICS_PORT:-6060}:${GETH_METRICS_PORT:-6060}"
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:${GETH_HTTP_PORT:-8545}"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 1m
-    deploy:
-      resources:
-        limits:
-          cpus: '${GETH_CPU_LIMIT:-4}'
-          memory: ${GETH_MEMORY_LIMIT:-8G}
-        reservations:
-          cpus: '${GETH_CPU_RESERVATION:-2}'
-          memory: ${GETH_MEMORY_RESERVATION:-4G}
     logging:
       driver: "${LOGGING_DRIVER:-json-file}"
       options:
@@ -66,22 +53,23 @@ services:
 
   # Consensus Layer (Prysm Beacon)
   beacon:
-    image: gcr.io/prysmaticlabs/prysm/beacon-chain:${BEACON_VERSION:-v5.3.0}
+    image: gcr.io/prysmaticlabs/prysm/beacon-chain:${BEACON_VERSION:-v7.1.2}
     container_name: hoodi-beacon
     restart: unless-stopped
     depends_on:
       geth:
-        condition: service_healthy
+        condition: service_started
       mev-boost:
         condition: service_healthy
     command:
       - --${NETWORK_NAME:-hoodi}
+      - --peer=/ip4/34.81.97.215/tcp/33212/p2p/16Uiu2HAkvjKfCdS7spHZrRmSVPg8P4LGvPw7E4cCKc3mr7qkmz2K
       - --datadir=/data/beacon
       - --execution-endpoint=http://geth:8551
       - --jwt-secret=/jwt/jwtsecret
       - --rpc-host=${BEACON_RPC_ADDR:-127.0.0.1}
       - --rpc-port=${BEACON_RPC_PORT:-4000}
-      - --grpc-gateway-host=${BEACON_REST_ADDR:-127.0.0.1}
+      - --grpc-gateway-host=${BEACON_REST_ADDR:-0.0.0.0}
       - --grpc-gateway-port=${BEACON_REST_PORT:-5052}
       - --p2p-tcp-port=${BEACON_P2P_TCP_PORT:-13000}
       - --p2p-udp-port=${BEACON_P2P_UDP_PORT:-12000}
@@ -90,8 +78,7 @@ services:
       - --monitoring-port=${BEACON_METRICS_PORT:-8008}
       - --checkpoint-sync-url=${BEACON_CHECKPOINT_SYNC_URL:-https://hoodi.beaconstate.ethstaker.cc}
       - --accept-terms-of-use=true
-      - --builder-grpc-endpoint=mev-boost:${MEV_BOOST_PORT:-3500}
-      - --enable-debug-rpc-endpoints
+
     volumes:
       - ./data/beacon:/data/beacon
       - ./jwt:/jwt:ro
@@ -101,20 +88,6 @@ services:
       - "${BEACON_METRICS_ADDR:-127.0.0.1}:${BEACON_METRICS_PORT:-8008}:${BEACON_METRICS_PORT:-8008}"
       - "${BEACON_P2P_TCP_PORT:-13000}:${BEACON_P2P_TCP_PORT:-13000}"
       - "${BEACON_P2P_UDP_PORT:-12000}:${BEACON_P2P_UDP_PORT:-12000}/udp"
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:${BEACON_REST_PORT:-5052}/eth/v1/node/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 2m
-    deploy:
-      resources:
-        limits:
-          cpus: '${BEACON_CPU_LIMIT:-4}'
-          memory: ${BEACON_MEMORY_LIMIT:-16G}
-        reservations:
-          cpus: '${BEACON_CPU_RESERVATION:-2}'
-          memory: ${BEACON_MEMORY_RESERVATION:-8G}
     logging:
       driver: "${LOGGING_DRIVER:-json-file}"
       options:
@@ -127,28 +100,29 @@ services:
 
   # Validator Client (Prysm)
   validator:
-    image: gcr.io/prysmaticlabs/prysm/validator:${VALIDATOR_VERSION:-v5.3.0}
+    image: gcr.io/prysmaticlabs/prysm/validator:${VALIDATOR_VERSION:-v7.1.2}
     container_name: hoodi-validator
     restart: unless-stopped
     depends_on:
       beacon:
-        condition: service_healthy
+        condition: service_started
     command:
       - --${NETWORK_NAME:-hoodi}
       - --accept-terms-of-use=true
       - --datadir=/data/validator
-      - --beacon-rpc-provider=beacon:${BEACON_RPC_PORT:-4000}
-      - --beacon-rpc-gateway-provider=http://beacon:${BEACON_REST_PORT:-5052}
+      - --beacon-rest-api-provider=http://beacon:${BEACON_REST_PORT:-5052}
+      - --enable-beacon-rest-api
       - --wallet-dir=/data/validator
       - --wallet-password-file=/secrets/wallet-password.txt
       - --suggested-fee-recipient=${FEE_RECIPIENT:-0x0000000000000000000000000000000000000000}
       - --monitoring-host=${VALIDATOR_METRICS_ADDR:-127.0.0.1}
       - --monitoring-port=${VALIDATOR_METRICS_PORT:-8009}
-      - --enable-doppelgänger-protection=${VALIDATOR_DOPPELGANGER_PROTECTION:-true}
+      - --enable-doppelganger
       - --graffiti=${VALIDATOR_GRAFFITI:-hoodi-validator}
     volumes:
       - ./data/validator:/data/validator
       - ./secrets:/secrets:ro
+      - ./init-validator.sh:/scripts/init-validator.sh:ro
     ports:
       - "${VALIDATOR_METRICS_ADDR:-127.0.0.1}:${VALIDATOR_METRICS_PORT:-8009}:${VALIDATOR_METRICS_PORT:-8009}"
     healthcheck:
@@ -157,14 +131,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 2m
-    deploy:
-      resources:
-        limits:
-          cpus: '${VALIDATOR_CPU_LIMIT:-2}'
-          memory: ${VALIDATOR_MEMORY_LIMIT:-4G}
-        reservations:
-          cpus: '${VALIDATOR_CPU_RESERVATION:-1}'
-          memory: ${VALIDATOR_MEMORY_RESERVATION:-2G}
     logging:
       driver: "${LOGGING_DRIVER:-json-file}"
       options:
@@ -177,12 +143,12 @@ services:
 
   # MEV-Boost (Multiple Relays)
   mev-boost:
-    image: flashbots/mev-boost:${MEV_BOOST_VERSION:-v1.7}
+    image: flashbots/mev-boost:${MEV_BOOST_VERSION:-1.10.1}
     container_name: hoodi-mev-boost
     restart: unless-stopped
     command:
       - -addr=0.0.0.0:${MEV_BOOST_PORT:-3500}
-      - -mainnet=false
+      - -hoodi
       - -relay-check
       - -relays=${MEV_RELAYS:-https://0xaa58208899c6105603b74396734a6263cc7d947f444f396a90f7b7d3e65d102aec7e5e5291b27e08d02c50a050825c2f@hoodi.titanrelay.xyz}
     ports:
@@ -193,14 +159,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 1m
-    deploy:
-      resources:
-        limits:
-          cpus: '${MEV_CPU_LIMIT:-1}'
-          memory: ${MEV_MEMORY_LIMIT:-2G}
-        reservations:
-          cpus: '${MEV_CPU_RESERVATION:-0.5}'
-          memory: ${MEV_MEMORY_RESERVATION:-1G}
     logging:
       driver: "${LOGGING_DRIVER:-json-file}"
       options:
