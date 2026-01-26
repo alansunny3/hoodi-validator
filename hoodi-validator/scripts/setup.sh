@@ -195,17 +195,17 @@ if [ -f "secrets/wallet-password.txt" ]; then
         echo
         read -sp "Confirm password: " VALIDATOR_PASSWORD_CONFIRM
         echo
-        
+
         if [ "$VALIDATOR_PASSWORD" != "$VALIDATOR_PASSWORD_CONFIRM" ]; then
             print_error "Passwords do not match!"
             exit 1
         fi
-        
+
         if [ ${#VALIDATOR_PASSWORD} -lt 12 ]; then
             print_error "Password must be at least 12 characters long"
             exit 1
         fi
-        
+
         echo "$VALIDATOR_PASSWORD" > secrets/wallet-password.txt
         chmod 600 secrets/wallet-password.txt
         print_success "Updated validator password"
@@ -217,17 +217,17 @@ else
     echo
     read -sp "Confirm password: " VALIDATOR_PASSWORD_CONFIRM
     echo
-    
+
     if [ "$VALIDATOR_PASSWORD" != "$VALIDATOR_PASSWORD_CONFIRM" ]; then
         print_error "Passwords do not match!"
         exit 1
     fi
-    
+
     if [ ${#VALIDATOR_PASSWORD} -lt 12 ]; then
         print_error "Password must be at least 12 characters long"
         exit 1
     fi
-    
+
     echo "$VALIDATOR_PASSWORD" > secrets/wallet-password.txt
     chmod 600 secrets/wallet-password.txt
     print_success "Created validator password file"
@@ -294,13 +294,13 @@ print_section "Verifying Configuration"
 # Check .env file
 if [ -f ".env" ]; then
     print_success ".env file exists"
-    
+
     # Check for critical variables
     if grep -q "FEE_RECIPIENT=0x0000000000000000000000000000000000000000" .env; then
         print_warning "FEE_RECIPIENT is still set to null address (0x0000...)"
         print_info "Update .env with your Ethereum address before deploying"
     fi
-    
+
     if grep -q "VALIDATOR_PASSWORD=your-secure-password-here" .env; then
         print_warning "VALIDATOR_PASSWORD is still set to default"
         print_info "Update .env with your password before deploying"
