@@ -15,8 +15,8 @@ A production-ready, fully fixed Ethereum Hoodi validator deployment package with
 
 ```bash
 # Extract package
-tar -xzf hoodi-validator-fixed.tar.gz
-cd hoodi-validator-fixed
+tar -xzf hoodi-validator.tar.gz
+cd hoodi-validator
 
 # Run setup
 ./scripts/setup.sh
